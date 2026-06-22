@@ -53,9 +53,21 @@ TH_MONTHS = {
 
 
 def fetch(url):
-    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "text/html"})
+    req = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": UA,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "th,en;q=0.8",
+            "Accept-Encoding": "identity",
+        },
+    )
     with urllib.request.urlopen(req, timeout=TIMEOUT, context=_SSL_CTX) as r:
-        return r.read().decode("utf-8", "ignore")
+        html = r.read().decode("utf-8", "ignore")
+    low = html.lower()
+    challenge = any(x in low for x in ("just a moment", "cf-challenge", "cf_chl", "enable javascript and cookies", "attention required"))
+    print(f"[diag] {url} -> {len(html)} bytes | งวด={'งวดวันที่' in html} | challenge={challenge}", file=sys.stderr)
+    return html
 
 
 def to_text(html):
