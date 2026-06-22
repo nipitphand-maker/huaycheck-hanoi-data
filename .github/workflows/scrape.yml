@@ -1,0 +1,44 @@
+name: Scrape Hanoi results
+
+on:
+  schedule:
+    # Hanoi VIP draws ~19:00-19:30 Thai (UTC+7). Run at 13:30 UTC (20:30 Thai) to
+    # catch Special + VIP + Normal of the day. Second run as a lag safety net.
+    - cron: "30 13 * * *"
+    - cron: "0 15 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: scrape
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Scrape
+        run: python scrape.py
+
+      - name: Commit if changed
+        run: |
+          git config user.name "hanoi-bot"
+          git config user.email "bot@users.noreply.github.com"
+          if [ -n "$(git status --porcelain data/hanoi.json)" ]; then
+            git add data/hanoi.json
+            git commit -m "data: hanoi results $(date -u +%Y-%m-%dT%H:%MZ)"
+            git push
+          else
+            echo "No change."
+          fi
