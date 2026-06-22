@@ -19,6 +19,7 @@ import json
 import re
 import ssl
 import sys
+import time
 import urllib.request
 from datetime import datetime, timezone, timedelta
 
@@ -52,7 +53,7 @@ TH_MONTHS = {
 }
 
 
-def fetch(url):
+def _fetch_once(url):
     req = urllib.request.Request(
         url,
         headers={
@@ -63,11 +64,30 @@ def fetch(url):
         },
     )
     with urllib.request.urlopen(req, timeout=TIMEOUT, context=_SSL_CTX) as r:
-        html = r.read().decode("utf-8", "ignore")
-    low = html.lower()
-    challenge = any(x in low for x in ("just a moment", "cf-challenge", "cf_chl", "enable javascript and cookies", "attention required"))
-    print(f"[diag] {url} -> {len(html)} bytes | งวด={'งวดวันที่' in html} | challenge={challenge}", file=sys.stderr)
-    return html
+        return r.read().decode("utf-8", "ignore")
+
+
+def fetch(url, must_contain="งวดวันที่", attempts=3):
+    """Fetch with retry. Datacenter IPs intermittently get a soft-block page
+    (HTTP 200, no real data) instead of the result table — retry with backoff
+    so a single bad response doesn't fail the whole run."""
+    last = ""
+    for i in range(attempts):
+        try:
+            html = _fetch_once(url)
+        except Exception as e:
+            print(f"[diag] {url} attempt {i + 1}: {e}", file=sys.stderr)
+            time.sleep(3 * (i + 1))
+            continue
+        low = html.lower()
+        challenge = any(x in low for x in ("just a moment", "cf-challenge", "cf_chl", "enable javascript and cookies", "attention required"))
+        ok = (must_contain in html) and not challenge
+        print(f"[diag] {url} attempt {i + 1} -> {len(html)} bytes | ok={ok} | challenge={challenge}", file=sys.stderr)
+        if ok:
+            return html
+        last = html
+        time.sleep(3 * (i + 1))
+    return last  # best-effort; parser will return nothing and the source is skipped
 
 
 def to_text(html):
