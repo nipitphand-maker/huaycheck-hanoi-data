@@ -70,7 +70,12 @@ def _fetch_once(url):
 def fetch(url, must_contain="งวดวันที่", attempts=3):
     """Fetch with retry. Datacenter IPs intermittently get a soft-block page
     (HTTP 200, no real data) instead of the result table — retry with backoff
-    so a single bad response doesn't fail the whole run."""
+    so a single bad response doesn't fail the whole run.
+
+    Returns (html, ok): ok=True means a real result page came back (marker
+    present, not a challenge). ok=False means every attempt was blocked or
+    errored — the caller treats that source as *unreachable*, not broken, so a
+    transient block doesn't masquerade as a genuine layout change."""
     last = ""
     for i in range(attempts):
         try:
@@ -84,10 +89,10 @@ def fetch(url, must_contain="งวดวันที่", attempts=3):
         ok = (must_contain in html) and not challenge
         print(f"[diag] {url} attempt {i + 1} -> {len(html)} bytes | ok={ok} | challenge={challenge}", file=sys.stderr)
         if ok:
-            return html
+            return html, True
         last = html
         time.sleep(3 * (i + 1))
-    return last  # best-effort; parser will return nothing and the source is skipped
+    return last, False  # best-effort; source is unreachable (likely soft-blocked)
 
 
 def to_text(html):
@@ -173,11 +178,17 @@ def parse_ruay(text):
 def main():
     today = datetime.now(timezone(timedelta(hours=7))).date()  # Thai time
     draws = {}
+    # Did *any* source serve a real result page this run? Distinguishes a
+    # transient soft-block (every source unreachable) from a real layout change
+    # (page fetched fine, but parsing produced nothing).
+    any_reachable = False
 
     # press.in.th (primary) ----------------------------------------------------
     press = {}
     try:
-        press = parse_press(to_text(fetch(PRESS_URL)))
+        html, ok = fetch(PRESS_URL)
+        any_reachable = any_reachable or ok
+        press = parse_press(to_text(html))
     except Exception as e:
         print(f"[warn] press failed: {e}", file=sys.stderr)
 
@@ -185,7 +196,9 @@ def main():
     ruay = {}
     for cat, url in RUAY.items():
         try:
-            ruay[cat] = parse_ruay(to_text(fetch(url)))
+            html, ok = fetch(url)
+            any_reachable = any_reachable or ok
+            ruay[cat] = parse_ruay(to_text(html))
         except Exception as e:
             print(f"[warn] ruayy {cat} failed: {e}", file=sys.stderr)
 
@@ -210,6 +223,22 @@ def main():
             "sources": ["ruayy"], "verified": False,
         }
 
+    # No fresh draws is two very different situations. Decide *before* we touch
+    # the output file so a transient block never overwrites good data with {}.
+    if not draws:
+        if not any_reachable:
+            # Every source was soft-blocked/unreachable this run. Leave the last
+            # good data/hanoi.json in place and exit cleanly — the next
+            # scheduled run (or the lag-safety-net cron) retries from a fresh IP.
+            print("[warn] all sources unreachable (likely transient soft-block); "
+                  "keeping previous data, skipping this run", file=sys.stderr)
+            return
+        # Sources answered with real pages but nothing parsed — that's a genuine
+        # layout change that needs a code fix. Fail loudly.
+        print("[error] sources reachable but no fresh draws parsed — "
+              "page layout likely changed, fix the parser", file=sys.stderr)
+        sys.exit(1)
+
     payload = {
         "generatedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "draws": draws,
@@ -217,10 +246,6 @@ def main():
     with open("data/hanoi.json", "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
     print(json.dumps(payload, ensure_ascii=False, indent=2))
-
-    if not draws:
-        print("[error] no fresh draws parsed from any source", file=sys.stderr)
-        sys.exit(1)
 
 
 if __name__ == "__main__":
