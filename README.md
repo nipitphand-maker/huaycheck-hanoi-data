@@ -40,6 +40,24 @@ https://raw.githubusercontent.com/<owner>/huaycheck-hanoi-data/main/data/hanoi.j
   source for VIP. Same LottoVIP/Ruay affiliate ring as press (agreement = parse
   correctness, not independent ground truth).
 
+## Reliability
+
+GitHub Actions runner IPs occasionally get **soft-blocked** by the sources
+(HTTP 200 but a stripped page, no results). To keep data flowing:
+
+- **Multiple daily runs** at spread-out times — each is a fresh runner IP, so
+  it's very unlikely they all get blocked the same evening.
+- **Mirror fallback** — if a direct fetch is blocked, `scrape.py` re-fetches the
+  same page through raw-HTML proxies on a different network.
+- **Never clobbers** — a failed run leaves the last good `data/hanoi.json`
+  untouched instead of writing an empty result.
+- **Staleness alarm** — a single blocked run passes quietly (green). But if the
+  *published* data falls older than `MAX_DATA_AGE_DAYS`, the run goes **red** so
+  a real, multi-day breakage surfaces fast instead of silently. A red workflow
+  therefore means "data is genuinely stale" — check whether a source changed
+  layout (`scrape.py` prints `[error] ... layout likely changed`) or is simply
+  down.
+
 ## Run locally
 
 ```

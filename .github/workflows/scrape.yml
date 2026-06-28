@@ -2,10 +2,16 @@ name: Scrape Hanoi results
 
 on:
   schedule:
-    # Hanoi VIP draws ~19:00-19:30 Thai (UTC+7). Run at 13:30 UTC (20:30 Thai) to
-    # catch Special + VIP + Normal of the day. Second run as a lag safety net.
-    - cron: "30 13 * * *"
-    - cron: "0 15 * * *"
+    # Hanoi draws ~19:00-19:30 Thai (UTC+7); results settle by ~20:00 Thai
+    # (13:00 UTC). Datacenter IPs get soft-blocked intermittently, so fire
+    # several times across the evening — each run is a fresh runner IP, so it's
+    # very unlikely they all get blocked. The first to succeed commits; the rest
+    # find no change and no-op.
+    - cron: "0 13 * * *"    # 20:00 Thai
+    - cron: "45 13 * * *"   # 20:45 Thai
+    - cron: "30 14 * * *"   # 21:30 Thai
+    - cron: "30 15 * * *"   # 22:30 Thai
+    - cron: "0 17 * * *"    # 00:00 Thai (late safety net)
   workflow_dispatch: {}
 
 permissions:
@@ -18,6 +24,7 @@ concurrency:
 jobs:
   scrape:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
