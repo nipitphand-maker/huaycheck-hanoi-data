@@ -1,0 +1,97 @@
+name: Autofix scrape
+
+# When "Scrape Hanoi results" goes red, this fires Claude Code to work out WHY
+# and self-heal the common case — a source changed its page layout so the regex
+# parser stops matching. Claude diagnoses, patches scrape.py, verifies the fix
+# actually parses live data, and opens a PR for review. It deliberately does
+# NOTHING when the red was just a transient soft-block (no code is broken), so
+# it never opens noise PRs.
+
+on:
+  workflow_run:
+    workflows: ["Scrape Hanoi results"]
+    types: [completed]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+
+concurrency:
+  group: autofix-scrape
+  cancel-in-progress: true
+
+jobs:
+  autofix:
+    # Only on a genuine failure (or manual trigger). Successful/transient-block
+    # runs now exit 0, so they never reach here.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'failure' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: --model claude-sonnet-4-6 --allowedTools "Bash,Read,Edit,Write,Grep,Glob"
+          prompt: |
+            The scheduled "Scrape Hanoi results" workflow just failed. You are an
+            automated maintainer for this repo. Your job: figure out whether the
+            scraper code is actually broken, and if so, fix it and open a PR.
+
+            ## Step 1 — reproduce and classify (do this before touching anything)
+            Run `python scrape.py` and read its `[diag]` / `[error]` / `[warn]`
+            lines on stderr. Decide which case you're in:
+
+            - **Transient block** — the diagnostics show every source `ok=False`
+              with connection errors / soft-block pages (`challenge` or a tiny
+              page), i.e. the runner IP just couldn't reach the sites, OR the
+              only error is `[error] published data is N days stale` while pages
+              are unreachable. The CODE IS NOT BROKEN. **Do nothing**: do not
+              edit files, do not open a PR. Print a short note saying it was a
+              transient block and STOP.
+
+            - **Layout change** — diagnostics show a source WAS reachable
+              (`ok=True`, real page bytes) but parsing produced nothing, i.e.
+              `[error] sources reachable but no fresh draws parsed`. THIS is what
+              you fix.
+
+            ## Step 2 — only if it's a layout change
+            1. First check there isn't already an open fix PR: run
+               `gh pr list --state open --json headRefName,number,title` and look
+               for a branch whose name starts with `autofix/scrape`. If one
+               exists, STOP — don't open a duplicate.
+            2. Fetch the live page(s) that broke (the URLs are in scrape.py:
+               PRESS_URL and the RUAY dict) with curl using a browser User-Agent,
+               and inspect how the result table is now structured.
+            3. Update ONLY the parsing regexes / helpers in scrape.py
+               (parse_press, parse_ruay, the iso_* and date helpers) to match the
+               new layout. Do not weaken the freshness guard, the cross-check
+               verification, or the staleness alarm. Keep the output JSON schema
+               in data/hanoi.json identical.
+            4. Verify: run `python scrape.py` again and confirm it now parses
+               fresh draws and exits 0, and that data/hanoi.json looks correct
+               (right dates, 3-digit/2-digit fields populated).
+            5. Open a PR with `gh`: create a branch named
+               `autofix/scrape-<short-date-or-topic>`, commit the scrape.py
+               change (message: `fix: adapt parser to <source> layout change`),
+               and open a PR to `main`. In the PR body explain what changed on
+               the source page, what you changed in the parser, and paste the
+               before/after `python scrape.py` output. Do NOT merge it — leave it
+               for human review.
+
+            Be conservative: if you cannot clearly identify the layout change or
+            cannot get the scraper to parse real data after your edit, do NOT
+            open a PR — instead open a GitHub issue summarizing what you found so
+            a human can take over.
