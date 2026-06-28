@@ -16,10 +16,12 @@ Design rules (do NOT break):
     or only one source is available (VIP is single-source).
 """
 import json
+import random
 import re
 import ssl
 import sys
 import time
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone, timedelta
 
@@ -29,11 +31,39 @@ try:
 except Exception:
     _SSL_CTX = ssl.create_default_context()
 
-UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/148.0 Safari/537.36"
-TIMEOUT = 30
+# Rotated per attempt: a fixed UA is an easy soft-block signature.
+UAS = [
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0 Safari/537.36",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
+]
+TIMEOUT = 25
 # Accept a draw only if its date is within this many days of the run — kills the
 # "site shows yesterday, we stamp it today" failure mode.
 MAX_STALE_DAYS = 3
+# If the *published* data ever falls older than this, the scrape has been failing
+# for real (not a one-off blip) — fail loudly so the workflow goes red and we
+# find out in a day, not after a week of silent staleness.
+MAX_DATA_AGE_DAYS = 1
+
+
+def _direct(u):
+    return u
+
+
+def _via_allorigins(u):
+    return "https://api.allorigins.win/raw?url=" + urllib.parse.quote(u, safe="")
+
+
+def _via_codetabs(u):
+    return "https://api.codetabs.com/v1/proxy/?quest=" + urllib.parse.quote(u, safe="")
+
+
+# When the runner IP gets soft-blocked, re-fetch through a raw-HTML mirror on a
+# *different* network. These return the ORIGINAL html, so the parsers below work
+# unchanged. Tried in order, only after a direct hit fails.
+EGRESSES = [("direct", _direct), ("allorigins", _via_allorigins), ("codetabs", _via_codetabs)]
 
 PRESS_URL = "https://press.in.th/hanoi-lotto/"
 RUAY = {
@@ -53,46 +83,61 @@ TH_MONTHS = {
 }
 
 
-def _fetch_once(url):
+def _fetch_once(url, ua):
     req = urllib.request.Request(
         url,
         headers={
-            "User-Agent": UA,
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "th,en;q=0.8",
+            "User-Agent": ua,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            "Accept-Language": "th,en-US;q=0.8,en;q=0.6",
             "Accept-Encoding": "identity",
+            "Referer": "https://www.google.com/",
+            "Upgrade-Insecure-Requests": "1",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "cross-site",
+            "Sec-Fetch-User": "?1",
+            "Cache-Control": "no-cache",
         },
     )
     with urllib.request.urlopen(req, timeout=TIMEOUT, context=_SSL_CTX) as r:
         return r.read().decode("utf-8", "ignore")
 
 
-def fetch(url, must_contain="งวดวันที่", attempts=3):
-    """Fetch with retry. Datacenter IPs intermittently get a soft-block page
-    (HTTP 200, no real data) instead of the result table — retry with backoff
-    so a single bad response doesn't fail the whole run.
+def fetch(url, must_contain="งวดวันที่", attempts=2):
+    """Fetch a result page, defeating intermittent datacenter soft-blocks.
+
+    Datacenter IPs sometimes get a soft-block page (HTTP 200, no real data)
+    instead of the result table. We try the URL directly first, then re-fetch it
+    through raw-HTML mirrors on a *different* network if the runner IP is blocked
+    — rotating UA and backing off with jitter between attempts.
 
     Returns (html, ok): ok=True means a real result page came back (marker
-    present, not a challenge). ok=False means every attempt was blocked or
-    errored — the caller treats that source as *unreachable*, not broken, so a
-    transient block doesn't masquerade as a genuine layout change."""
+    present, not a challenge). ok=False means every egress was blocked or errored
+    — the caller treats that source as *unreachable*, not broken, so a transient
+    block doesn't masquerade as a genuine layout change."""
     last = ""
-    for i in range(attempts):
-        try:
-            html = _fetch_once(url)
-        except Exception as e:
-            print(f"[diag] {url} attempt {i + 1}: {e}", file=sys.stderr)
-            time.sleep(3 * (i + 1))
-            continue
-        low = html.lower()
-        challenge = any(x in low for x in ("just a moment", "cf-challenge", "cf_chl", "enable javascript and cookies", "attention required"))
-        ok = (must_contain in html) and not challenge
-        print(f"[diag] {url} attempt {i + 1} -> {len(html)} bytes | ok={ok} | challenge={challenge}", file=sys.stderr)
-        if ok:
-            return html, True
-        last = html
-        time.sleep(3 * (i + 1))
-    return last, False  # best-effort; source is unreachable (likely soft-blocked)
+    ua_i = 0
+    for egress, build in EGRESSES:
+        target = build(url)
+        for i in range(attempts):
+            ua = UAS[ua_i % len(UAS)]
+            ua_i += 1
+            try:
+                html = _fetch_once(target, ua)
+            except Exception as e:
+                print(f"[diag] {url} [{egress}] attempt {i + 1}: {e}", file=sys.stderr)
+                time.sleep(2 + 2 * i + random.uniform(0, 1.5))
+                continue
+            low = html.lower()
+            challenge = any(x in low for x in ("just a moment", "cf-challenge", "cf_chl", "enable javascript and cookies", "attention required"))
+            ok = (must_contain in html) and not challenge
+            print(f"[diag] {url} [{egress}] attempt {i + 1} -> {len(html)} bytes | ok={ok} | challenge={challenge}", file=sys.stderr)
+            if ok:
+                return html, True
+            last = html
+            time.sleep(1 + i + random.uniform(0, 1.0))
+    return last, False  # best-effort; every egress unreachable (likely soft-blocked)
 
 
 def to_text(html):
@@ -138,6 +183,23 @@ def fresh(iso, today):
     except ValueError:
         return False
     return 0 <= (today - dd).days <= MAX_STALE_DAYS
+
+
+def published_newest_date():
+    """Newest draw date already committed in data/hanoi.json (None if missing/
+    empty). Used to tell a one-off blip from data that has gone genuinely stale."""
+    try:
+        with open("data/hanoi.json", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return None
+    dates = []
+    for d in (data.get("draws") or {}).values():
+        try:
+            dates.append(datetime.strptime(d["date"], "%Y-%m-%d").date())
+        except (KeyError, TypeError, ValueError):
+            continue
+    return max(dates) if dates else None
 
 
 def parse_press(text):
@@ -223,29 +285,42 @@ def main():
             "sources": ["ruayy"], "verified": False,
         }
 
-    # No fresh draws is two very different situations. Decide *before* we touch
-    # the output file so a transient block never overwrites good data with {}.
-    if not draws:
-        if not any_reachable:
-            # Every source was soft-blocked/unreachable this run. Leave the last
-            # good data/hanoi.json in place and exit cleanly — the next
-            # scheduled run (or the lag-safety-net cron) retries from a fresh IP.
-            print("[warn] all sources unreachable (likely transient soft-block); "
-                  "keeping previous data, skipping this run", file=sys.stderr)
-            return
-        # Sources answered with real pages but nothing parsed — that's a genuine
-        # layout change that needs a code fix. Fail loudly.
+    # Write fresh data only when we actually have some — never overwrite good
+    # data/hanoi.json with {} on a bad run.
+    if draws:
+        payload = {
+            "generatedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "draws": draws,
+        }
+        with open("data/hanoi.json", "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+    elif any_reachable:
+        # Pages loaded fine but nothing parsed — a genuine layout change that
+        # needs a code fix. Fail loudly right away.
         print("[error] sources reachable but no fresh draws parsed — "
               "page layout likely changed, fix the parser", file=sys.stderr)
         sys.exit(1)
+    else:
+        # Every egress was soft-blocked this run. Leave the last good data in
+        # place; a single blip is tolerated (see the staleness alarm below).
+        print("[warn] all sources unreachable (likely transient soft-block); "
+              "keeping previous data for this run", file=sys.stderr)
 
-    payload = {
-        "generatedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "draws": draws,
-    }
-    with open("data/hanoi.json", "w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False, indent=2)
-    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    # Staleness alarm — the real guard against silently breaking for days. The
+    # multiple daily crons make one blocked run a non-event, but if the PUBLISHED
+    # data ever falls older than MAX_DATA_AGE_DAYS the scrape is failing for real,
+    # so go red and surface it now instead of after a week.
+    newest = published_newest_date()
+    if newest is None:
+        print("[error] no draws have ever been published — scrape is broken", file=sys.stderr)
+        sys.exit(1)
+    age = (today - newest).days
+    if age > MAX_DATA_AGE_DAYS:
+        print(f"[error] published data is {age} days stale (newest draw {newest}); "
+              "the scrape has been failing across runs — needs attention", file=sys.stderr)
+        sys.exit(1)
+    print(f"[ok] published data current as of {newest} ({age}d old)", file=sys.stderr)
 
 
 if __name__ == "__main__":
