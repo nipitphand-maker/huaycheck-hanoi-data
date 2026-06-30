@@ -17,6 +17,7 @@ permissions:
   contents: write
   pull-requests: write
   actions: read
+  id-token: write  # claude-code-action@v1 exchanges an OIDC token; without this the run fails before doing any work
 
 concurrency:
   group: autofix-scrape
