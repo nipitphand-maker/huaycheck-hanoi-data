@@ -39,7 +39,9 @@ copy or another session's stale checkout as the base.
 - `.github/workflows/autofix-scrape.yml` — when scrape goes red, runs Claude Code
   to classify the failure and, **only for a real layout change**, patch the parser
   against the live page, verify, and open a PR. Transient blocks are left alone.
-  **Requires repo secret `ANTHROPIC_API_KEY`** (not yet set as of 2026-06-29).
+  **Requires repo secret `ANTHROPIC_API_KEY`** (set 2026-06-30) and
+  `id-token: write` permission (added in PR #5) — claude-code-action@v1 exchanges
+  an OIDC token and fails before doing any work without it.
 
 ## Sources & timing
 
