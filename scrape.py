@@ -246,7 +246,7 @@ def merge_history(existing, draws, limit=HISTORY_LIMIT):
     """Merge today's `draws` into existing per-category history: newest-first,
     dedup by date (today's value wins), trimmed to `limit`."""
     out = {}
-    for cat in set(existing) | set(draws):
+    for cat in sorted(set(existing) | set(draws)):
         by_date = {}
         for d in existing.get(cat, []):
             if d.get("date"):
