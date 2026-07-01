@@ -57,13 +57,23 @@ def _via_allorigins(u):
 
 
 def _via_codetabs(u):
-    return "https://api.codetabs.com/v1/proxy/?quest=" + urllib.parse.quote(u, safe="")
+    # codetabs wants the target URL raw after quest=, NOT percent-encoded
+    # (encoding it makes codetabs answer HTTP 400 Bad Request every time).
+    return "https://api.codetabs.com/v1/proxy/?quest=" + u
 
 
 # When the runner IP gets soft-blocked, re-fetch through a raw-HTML mirror on a
 # *different* network. These return the ORIGINAL html, so the parsers below work
-# unchanged. Tried in order, only after a direct hit fails.
-EGRESSES = [("direct", _direct), ("allorigins", _via_allorigins), ("codetabs", _via_codetabs)]
+# unchanged. Tried in order, only after a direct hit fails. `trusted` marks an
+# egress whose parse-failure is meaningful: only the DIRECT fetch is trusted for
+# the "layout changed" alarm — mirrors sometimes return a marker-containing but
+# unparseable variant (wrong locale, injected consent banner), so a mirror miss
+# must NOT trip the alarm.
+EGRESSES = [
+    ("direct", _direct, True),
+    ("allorigins", _via_allorigins, False),
+    ("codetabs", _via_codetabs, False),
+]
 
 PRESS_URL = "https://press.in.th/hanoi-lotto/"
 RUAY = {
@@ -112,15 +122,19 @@ def fetch(url, must_contain="งวดวันที่", attempts=2):
     through raw-HTML mirrors on a *different* network if the runner IP is blocked
     — rotating UA and backing off with jitter between attempts.
 
-    Returns (html, ok): ok=True means a real result page came back (marker
-    present, not a challenge). ok=False means every egress was blocked or errored
-    — the caller treats that source as *unreachable*, not broken, so a transient
-    block doesn't masquerade as a genuine layout change."""
+    Returns (html, ok, trusted): ok=True means a real result page came back
+    (marker present, not a challenge); `trusted` is True only when that page came
+    from the DIRECT fetch (see EGRESSES) — a mirror hit is ok=True, trusted=False.
+    ok=False means every egress was blocked or errored, so the caller treats the
+    source as *unreachable* rather than broken."""
     last = ""
     ua_i = 0
-    for egress, build in EGRESSES:
+    for egress, build, is_trusted in EGRESSES:
         target = build(url)
-        for i in range(attempts):
+        # Direct is worth a couple of tries; flaky mirrors get one shot each so a
+        # blocked run doesn't burn minutes on proxy timeouts.
+        n = attempts if egress == "direct" else 1
+        for i in range(n):
             ua = UAS[ua_i % len(UAS)]
             ua_i += 1
             try:
@@ -134,10 +148,10 @@ def fetch(url, must_contain="งวดวันที่", attempts=2):
             ok = (must_contain in html) and not challenge
             print(f"[diag] {url} [{egress}] attempt {i + 1} -> {len(html)} bytes | ok={ok} | challenge={challenge}", file=sys.stderr)
             if ok:
-                return html, True
+                return html, True, is_trusted
             last = html
             time.sleep(1 + i + random.uniform(0, 1.0))
-    return last, False  # best-effort; every egress unreachable (likely soft-blocked)
+    return last, False, False  # best-effort; every egress unreachable (soft-blocked)
 
 
 def to_text(html):
@@ -278,16 +292,17 @@ def published_newest_date():
 def main():
     today = datetime.now(timezone(timedelta(hours=7))).date()  # Thai time
     draws = {}
-    # Did *any* source serve a real result page this run? Distinguishes a
-    # transient soft-block (every source unreachable) from a real layout change
-    # (page fetched fine, but parsing produced nothing).
-    any_reachable = False
+    # Did a *directly-fetched* source serve a real result page this run? Only a
+    # direct hit is trusted to mean "the site is up and gave us the real page",
+    # so only it can trip the layout-change alarm. A mirror can return a
+    # marker-containing but unparseable variant — that must not read as broken.
+    direct_reachable = False
 
     # press.in.th (primary) ----------------------------------------------------
     press = {}
     try:
-        html, ok = fetch(PRESS_URL)
-        any_reachable = any_reachable or ok
+        html, ok, trusted = fetch(PRESS_URL)
+        direct_reachable = direct_reachable or trusted
         press = parse_press(to_text(html))
     except Exception as e:
         print(f"[warn] press failed: {e}", file=sys.stderr)
@@ -296,8 +311,8 @@ def main():
     ruay = {}
     for cat, url in RUAY.items():
         try:
-            html, ok = fetch(url)
-            any_reachable = any_reachable or ok
+            html, ok, trusted = fetch(url)
+            direct_reachable = direct_reachable or trusted
             ruay[cat] = parse_ruay(to_text(html))
         except Exception as e:
             print(f"[warn] ruayy {cat} failed: {e}", file=sys.stderr)
@@ -338,17 +353,18 @@ def main():
         with open("data/hanoi.json", "w", encoding="utf-8") as f:
             json.dump(payload, f, ensure_ascii=False, indent=2)
         print(json.dumps(payload, ensure_ascii=False, indent=2))
-    elif any_reachable:
-        # Pages loaded fine but nothing parsed — a genuine layout change that
-        # needs a code fix. Fail loudly right away.
+    elif direct_reachable:
+        # A source served us the real page *directly* yet nothing parsed — that's
+        # a genuine layout change that needs a code fix. Fail loudly right away.
         print("[error] sources reachable but no fresh draws parsed — "
               "page layout likely changed, fix the parser", file=sys.stderr)
         sys.exit(1)
     else:
-        # Every egress was soft-blocked this run. Leave the last good data in
-        # place; a single blip is tolerated (see the staleness alarm below).
-        print("[warn] all sources unreachable (likely transient soft-block); "
-              "keeping previous data for this run", file=sys.stderr)
+        # No direct hit this run (soft-blocked, or only flaky mirrors answered).
+        # Not trustworthy enough to call a layout change — keep the last good data
+        # and let the staleness alarm below catch any genuine multi-day breakage.
+        print("[warn] no source reachable directly this run (soft-block or "
+              "mirror-only); keeping previous data", file=sys.stderr)
 
     # Staleness alarm — the real guard against silently breaking for days. The
     # multiple daily crons make one blocked run a non-event, but if the PUBLISHED

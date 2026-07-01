@@ -24,8 +24,12 @@ copy or another session's stale checkout as the base.
 
 - **No source reachable** (every egress soft-blocked) → keep last good data,
   **exit 0**. A single blocked run is a non-event; the other daily crons cover it.
-- **Reachable but nothing parsed** → **exit 1** immediately = genuine layout
-  change (`[error] sources reachable but no fresh draws parsed`).
+- **Reachable *directly* but nothing parsed** → **exit 1** immediately = genuine
+  layout change (`[error] sources reachable but no fresh draws parsed`). Only a
+  **direct** hit trips this — a mirror can return a marker-containing but
+  unparseable variant, so mirror-only misses are treated as unreachable (exit 0),
+  not as breakage. `fetch()` returns `(html, ok, trusted)`; `trusted` is the
+  direct-only signal. Don't collapse it back to a plain "any reachable" flag.
 - **Published data older than `MAX_DATA_AGE_DAYS`** → **exit 1** (staleness alarm).
   So a **red workflow means data is genuinely stale**, not a one-off blip.
 - The output file is written **only when there are real draws**, so `draws` and
