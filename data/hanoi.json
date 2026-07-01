@@ -1,12 +1,12 @@
 {
-  "generatedAt": "2026-06-30T18:30:07Z",
+  "generatedAt": "2026-07-01T16:05:55Z",
   "draws": {
     "vn_hanoi_special": {
-      "date": "2026-06-30",
-      "num4": "8228",
-      "top3": "228",
-      "top2": "28",
-      "bottom2": "75",
+      "date": "2026-07-01",
+      "num4": "8332",
+      "top3": "332",
+      "top2": "32",
+      "bottom2": "51",
       "sources": [
         "press",
         "ruayy"
@@ -14,22 +14,22 @@
       "verified": true
     },
     "vn_hanoi": {
-      "date": "2026-06-30",
-      "num4": "0468",
-      "top3": "468",
-      "top2": "68",
-      "bottom2": "51",
+      "date": "2026-07-01",
+      "num4": "1854",
+      "top3": "854",
+      "top2": "54",
+      "bottom2": "54",
       "sources": [
         "press"
       ],
       "verified": true
     },
     "vn_hanoi_vip": {
-      "date": "2026-06-30",
+      "date": "2026-07-01",
       "num4": null,
-      "top3": "597",
-      "top2": "97",
-      "bottom2": "76",
+      "top3": "810",
+      "top2": "10",
+      "bottom2": "03",
       "sources": [
         "ruayy"
       ],
@@ -38,6 +38,17 @@
   },
   "history": {
     "vn_hanoi": [
+      {
+        "date": "2026-07-01",
+        "num4": "1854",
+        "top3": "854",
+        "top2": "54",
+        "bottom2": "54",
+        "sources": [
+          "press"
+        ],
+        "verified": true
+      },
       {
         "date": "2026-06-30",
         "num4": "0468",
@@ -73,6 +84,18 @@
       }
     ],
     "vn_hanoi_special": [
+      {
+        "date": "2026-07-01",
+        "num4": "8332",
+        "top3": "332",
+        "top2": "32",
+        "bottom2": "51",
+        "sources": [
+          "press",
+          "ruayy"
+        ],
+        "verified": true
+      },
       {
         "date": "2026-06-30",
         "num4": "8228",
@@ -111,6 +134,17 @@
       }
     ],
     "vn_hanoi_vip": [
+      {
+        "date": "2026-07-01",
+        "num4": null,
+        "top3": "810",
+        "top2": "10",
+        "bottom2": "03",
+        "sources": [
+          "ruayy"
+        ],
+        "verified": false
+      },
       {
         "date": "2026-06-30",
         "num4": null,
