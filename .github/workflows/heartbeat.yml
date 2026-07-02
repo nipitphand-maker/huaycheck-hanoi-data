@@ -1,0 +1,65 @@
+name: Scrape heartbeat
+
+# GitHub's schedule trigger is best-effort and can silently NOT fire — on
+# 2026-07-02 none of scrape.yml's 5 daily crons ran for ~20 hours straight even
+# though the workflow was active and correctly configured. A missed *trigger*
+# never produces a run, so scrape.py's own staleness alarm and the autofix bot
+# (which only react to a run's outcome) have nothing to react to — that failure
+# mode is invisible to both.
+#
+# This workflow is the outside-the-loop check: it runs on its own schedule,
+# looks at how old the published data actually is, and if the whole evening's
+# worth of scrape.yml crons never fired, it re-triggers scrape.yml itself and
+# opens an issue so a human notices even if no one is watching.
+
+on:
+  schedule:
+    - cron: "12 18 * * *"   # 01:12 Thai — after all 5 scrape.yml crons should have run
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  actions: write
+  issues: write
+
+concurrency:
+  group: scrape-heartbeat
+  cancel-in-progress: false
+
+jobs:
+  heartbeat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check data freshness and self-heal if the day's crons never fired
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          GENERATED_AT=$(python3 -c "import json; print(json.load(open('data/hanoi.json'))['generatedAt'])")
+          GENERATED_EPOCH=$(date -u -d "$GENERATED_AT" +%s)
+          NOW_EPOCH=$(date -u +%s)
+          AGE_HOURS=$(( (NOW_EPOCH - GENERATED_EPOCH) / 3600 ))
+          echo "data/hanoi.json generatedAt=$GENERATED_AT (${AGE_HOURS}h old)"
+
+          # Even the EARLIEST of today's 5 scrape crons (20:06 Thai) is only
+          # ~5h old by the time this heartbeat runs (01:12 Thai) if it fired at
+          # all. If NOTHING fired all evening, the newest data is from
+          # yesterday's cycle — ~24h old. 8h cleanly separates the two.
+          if [ "$AGE_HOURS" -le 8 ]; then
+            echo "Fresh enough — at least one of today's scrape crons ran. Nothing to do."
+            exit 0
+          fi
+
+          echo "::warning::data/hanoi.json is ${AGE_HOURS}h old — none of today's scrape crons appear to have fired. Re-triggering scrape.yml."
+          gh workflow run scrape.yml --ref main
+
+          TITLE="Scrape cron did not fire (heartbeat auto-retriggered)"
+          EXISTING=$(gh issue list --state open --search "$TITLE in:title" --json number -q '.[0].number' || true)
+          if [ -z "$EXISTING" ]; then
+            gh issue create --title "$TITLE" --body "None of the scheduled \`Scrape Hanoi results\` runs fired in the last ${AGE_HOURS}h (data/hanoi.json generatedAt=$GENERATED_AT). This is usually a GitHub Actions scheduling hiccup, not a code bug. The heartbeat has re-triggered scrape.yml manually — close this once data/hanoi.json is current again."
+          else
+            echo "Open heartbeat issue #$EXISTING already exists — not creating a duplicate."
+          fi

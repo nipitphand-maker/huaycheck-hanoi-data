@@ -7,11 +7,15 @@ on:
     # several times across the evening — each run is a fresh runner IP, so it's
     # very unlikely they all get blocked. The first to succeed commits; the rest
     # find no change and no-op.
-    - cron: "0 13 * * *"    # 20:00 Thai
-    - cron: "45 13 * * *"   # 20:45 Thai
-    - cron: "30 14 * * *"   # 21:30 Thai
-    - cron: "30 15 * * *"   # 22:30 Thai
-    - cron: "0 17 * * *"    # 00:00 Thai (late safety net)
+    # Minutes are offset off :00/:30 on purpose — GitHub's own docs warn that
+    # scheduled runs are most likely to be delayed/dropped "at the start of
+    # every hour" (and, by extension, other round marks); see heartbeat.yml for
+    # the backstop that catches it on the rare day even this isn't enough.
+    - cron: "6 13 * * *"    # 20:06 Thai
+    - cron: "51 13 * * *"   # 20:51 Thai
+    - cron: "36 14 * * *"   # 21:36 Thai
+    - cron: "36 15 * * *"   # 22:36 Thai
+    - cron: "6 17 * * *"    # 00:06 Thai (late safety net)
   workflow_dispatch: {}
 
 permissions:

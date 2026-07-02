@@ -11,7 +11,7 @@ edit**. They were once lost because a change was written against an old copy:
 
 1. **Soft-block defenses** — multi-egress `fetch()` (direct → `allorigins` →
    `codetabs` raw-HTML mirrors), rotated User-Agents, browser-like headers,
-   jittered backoff; `fetch()` returns `(html, ok)`; transient-block vs
+   jittered backoff; `fetch()` returns `(html, ok, trusted)`; transient-block vs
    layout-change exit logic; the **staleness alarm** (`MAX_DATA_AGE_DAYS`).
 2. **History accumulation** — `load_existing_history()` / `merge_history()` build
    `history.{cat}` (newest-first, deduped by date, capped at `HISTORY_LIMIT`).
@@ -37,15 +37,29 @@ copy or another session's stale checkout as the base.
 
 ## Workflows
 
-- `.github/workflows/scrape.yml` — 5 spread-out crons (20:00–00:00 Thai); each is
+- `.github/workflows/scrape.yml` — 5 spread-out crons (20:06–00:06 Thai); each is
   a fresh runner IP, so all-blocked-at-once is unlikely. First success commits,
-  the rest no-op. `timeout-minutes: 10`.
+  the rest no-op. `timeout-minutes: 10`. **Minutes are deliberately offset off
+  :00/:30** — GitHub's docs warn scheduled runs are most likely delayed/dropped
+  "at the start of every hour"; don't round these back to clean numbers.
 - `.github/workflows/autofix-scrape.yml` — when scrape goes red, runs Claude Code
   to classify the failure and, **only for a real layout change**, patch the parser
   against the live page, verify, and open a PR. Transient blocks are left alone.
   **Requires repo secret `ANTHROPIC_API_KEY`** (set 2026-06-30) and
   `id-token: write` permission (added in PR #5) — claude-code-action@v1 exchanges
   an OIDC token and fails before doing any work without it.
+- `.github/workflows/heartbeat.yml` — **the backstop for GitHub's own scheduler
+  going silent.** On 2026-07-02 none of scrape.yml's 5 daily crons fired for
+  ~20h even though the workflow was `active` and correctly configured — a
+  missed *trigger* never produces a run, so scrape.py's staleness alarm and the
+  autofix bot (both of which only react to a run's outcome) never got a chance
+  to see it. heartbeat.yml runs independently once a day (01:12 Thai, after all
+  5 scrape crons should have fired) and checks `data/hanoi.json`'s
+  `generatedAt` age directly from *outside* scrape.py. If it's >8h old (meaning
+  none of today's crons ran), it re-triggers `scrape.yml` via `gh workflow run`
+  and opens a GitHub issue (deduped by title) so a human notices. Needs
+  `actions: write` + `issues: write` permissions — don't drop them thinking
+  they're unused, `gh workflow run` / `gh issue create` need them.
 
 ## Sources & timing
 
