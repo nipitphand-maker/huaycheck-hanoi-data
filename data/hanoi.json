@@ -1,12 +1,12 @@
 {
-  "generatedAt": "2026-08-02T18:02:21Z",
+  "generatedAt": "2026-08-03T16:10:29Z",
   "draws": {
     "vn_hanoi_special": {
-      "date": "2026-08-02",
-      "num4": "8803",
-      "top3": "803",
-      "top2": "03",
-      "bottom2": "19",
+      "date": "2026-08-03",
+      "num4": "3371",
+      "top3": "371",
+      "top2": "71",
+      "bottom2": "41",
       "sources": [
         "press",
         "ruayy"
@@ -14,22 +14,22 @@
       "verified": true
     },
     "vn_hanoi": {
-      "date": "2026-08-02",
-      "num4": "1909",
-      "top3": "909",
-      "top2": "09",
-      "bottom2": "83",
+      "date": "2026-08-03",
+      "num4": "9247",
+      "top3": "247",
+      "top2": "47",
+      "bottom2": "41",
       "sources": [
         "press"
       ],
       "verified": true
     },
     "vn_hanoi_vip": {
-      "date": "2026-08-02",
+      "date": "2026-08-03",
       "num4": null,
-      "top3": "431",
-      "top2": "31",
-      "bottom2": "43",
+      "top3": "364",
+      "top2": "64",
+      "bottom2": "05",
       "sources": [
         "ruayy"
       ],
@@ -38,6 +38,17 @@
   },
   "history": {
     "vn_hanoi": [
+      {
+        "date": "2026-08-03",
+        "num4": "9247",
+        "top3": "247",
+        "top2": "47",
+        "bottom2": "41",
+        "sources": [
+          "press"
+        ],
+        "verified": true
+      },
       {
         "date": "2026-08-02",
         "num4": "1909",
@@ -436,6 +447,18 @@
       }
     ],
     "vn_hanoi_special": [
+      {
+        "date": "2026-08-03",
+        "num4": "3371",
+        "top3": "371",
+        "top2": "71",
+        "bottom2": "41",
+        "sources": [
+          "press",
+          "ruayy"
+        ],
+        "verified": true
+      },
       {
         "date": "2026-08-02",
         "num4": "8803",
@@ -870,6 +893,17 @@
       }
     ],
     "vn_hanoi_vip": [
+      {
+        "date": "2026-08-03",
+        "num4": null,
+        "top3": "364",
+        "top2": "64",
+        "bottom2": "05",
+        "sources": [
+          "ruayy"
+        ],
+        "verified": false
+      },
       {
         "date": "2026-08-02",
         "num4": null,
