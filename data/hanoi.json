@@ -1,12 +1,12 @@
 {
-  "generatedAt": "2026-08-10T17:53:43Z",
+  "generatedAt": "2026-08-11T14:23:11Z",
   "draws": {
     "vn_hanoi_special": {
-      "date": "2026-08-10",
-      "num4": "3092",
-      "top3": "092",
-      "top2": "92",
-      "bottom2": "64",
+      "date": "2026-08-11",
+      "num4": "7187",
+      "top3": "187",
+      "top2": "87",
+      "bottom2": "24",
       "sources": [
         "press",
         "ruayy"
@@ -14,22 +14,22 @@
       "verified": true
     },
     "vn_hanoi": {
-      "date": "2026-08-10",
-      "num4": "2957",
-      "top3": "957",
-      "top2": "57",
-      "bottom2": "50",
+      "date": "2026-08-11",
+      "num4": "2191",
+      "top3": "191",
+      "top2": "91",
+      "bottom2": "20",
       "sources": [
         "press"
       ],
       "verified": true
     },
     "vn_hanoi_vip": {
-      "date": "2026-08-10",
+      "date": "2026-08-11",
       "num4": null,
-      "top3": "185",
-      "top2": "85",
-      "bottom2": "91",
+      "top3": "824",
+      "top2": "24",
+      "bottom2": "47",
       "sources": [
         "ruayy"
       ],
@@ -38,6 +38,17 @@
   },
   "history": {
     "vn_hanoi": [
+      {
+        "date": "2026-08-11",
+        "num4": "2191",
+        "top3": "191",
+        "top2": "91",
+        "bottom2": "20",
+        "sources": [
+          "press"
+        ],
+        "verified": true
+      },
       {
         "date": "2026-08-10",
         "num4": "2957",
@@ -466,20 +477,21 @@
           "press"
         ],
         "verified": true
-      },
-      {
-        "date": "2026-07-02",
-        "num4": "1139",
-        "top3": "139",
-        "top2": "39",
-        "bottom2": "33",
-        "sources": [
-          "press"
-        ],
-        "verified": true
       }
     ],
     "vn_hanoi_special": [
+      {
+        "date": "2026-08-11",
+        "num4": "7187",
+        "top3": "187",
+        "top2": "87",
+        "bottom2": "24",
+        "sources": [
+          "press",
+          "ruayy"
+        ],
+        "verified": true
+      },
       {
         "date": "2026-08-10",
         "num4": "3092",
@@ -947,21 +959,20 @@
           "ruayy"
         ],
         "verified": true
-      },
-      {
-        "date": "2026-07-02",
-        "num4": "4113",
-        "top3": "113",
-        "top2": "13",
-        "bottom2": "28",
-        "sources": [
-          "press",
-          "ruayy"
-        ],
-        "verified": true
       }
     ],
     "vn_hanoi_vip": [
+      {
+        "date": "2026-08-11",
+        "num4": null,
+        "top3": "824",
+        "top2": "24",
+        "bottom2": "47",
+        "sources": [
+          "ruayy"
+        ],
+        "verified": false
+      },
       {
         "date": "2026-08-10",
         "num4": null,
@@ -1386,17 +1397,6 @@
         "top3": "386",
         "top2": "86",
         "bottom2": "58",
-        "sources": [
-          "ruayy"
-        ],
-        "verified": false
-      },
-      {
-        "date": "2026-07-02",
-        "num4": null,
-        "top3": "761",
-        "top2": "61",
-        "bottom2": "52",
         "sources": [
           "ruayy"
         ],
