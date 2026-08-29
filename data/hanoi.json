@@ -1,6 +1,29 @@
 {
-  "generatedAt": "2026-08-28T23:40:11Z",
+  "generatedAt": "2026-08-29T00:04:38Z",
   "draws": {
+    "vn_hanoi_special": {
+      "date": "2026-08-28",
+      "num4": "1551",
+      "top3": "551",
+      "top2": "51",
+      "bottom2": "67",
+      "sources": [
+        "press",
+        "ruayy"
+      ],
+      "verified": true
+    },
+    "vn_hanoi": {
+      "date": "2026-08-28",
+      "num4": "6168",
+      "top3": "168",
+      "top2": "68",
+      "bottom2": "20",
+      "sources": [
+        "press"
+      ],
+      "verified": true
+    },
     "vn_hanoi_vip": {
       "date": "2026-08-28",
       "num4": null,
@@ -15,6 +38,17 @@
   },
   "history": {
     "vn_hanoi": [
+      {
+        "date": "2026-08-28",
+        "num4": "6168",
+        "top3": "168",
+        "top2": "68",
+        "bottom2": "20",
+        "sources": [
+          "press"
+        ],
+        "verified": true
+      },
       {
         "date": "2026-08-25",
         "num4": "5080",
@@ -443,20 +477,21 @@
           "press"
         ],
         "verified": true
-      },
-      {
-        "date": "2026-07-17",
-        "num4": "5739",
-        "top3": "739",
-        "top2": "39",
-        "bottom2": "27",
-        "sources": [
-          "press"
-        ],
-        "verified": true
       }
     ],
     "vn_hanoi_special": [
+      {
+        "date": "2026-08-28",
+        "num4": "1551",
+        "top3": "551",
+        "top2": "51",
+        "bottom2": "67",
+        "sources": [
+          "press",
+          "ruayy"
+        ],
+        "verified": true
+      },
       {
         "date": "2026-08-25",
         "num4": "5311",
@@ -919,18 +954,6 @@
         "top3": "650",
         "top2": "50",
         "bottom2": "08",
-        "sources": [
-          "press",
-          "ruayy"
-        ],
-        "verified": true
-      },
-      {
-        "date": "2026-07-17",
-        "num4": "4725",
-        "top3": "725",
-        "top2": "25",
-        "bottom2": "20",
         "sources": [
           "press",
           "ruayy"
