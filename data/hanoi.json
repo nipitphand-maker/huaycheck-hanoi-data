@@ -1,12 +1,12 @@
 {
-  "generatedAt": "2026-09-04T19:22:08Z",
+  "generatedAt": "2026-09-05T15:57:41Z",
   "draws": {
     "vn_hanoi_vip": {
-      "date": "2026-09-04",
+      "date": "2026-09-05",
       "num4": null,
-      "top3": "309",
-      "top2": "09",
-      "bottom2": "89",
+      "top3": "024",
+      "top2": "24",
+      "bottom2": "94",
       "sources": [
         "ruayy"
       ],
@@ -940,6 +940,17 @@
     ],
     "vn_hanoi_vip": [
       {
+        "date": "2026-09-05",
+        "num4": null,
+        "top3": "024",
+        "top2": "24",
+        "bottom2": "94",
+        "sources": [
+          "ruayy"
+        ],
+        "verified": false
+      },
+      {
         "date": "2026-09-04",
         "num4": null,
         "top3": "309",
@@ -1363,17 +1374,6 @@
         "top3": "506",
         "top2": "06",
         "bottom2": "31",
-        "sources": [
-          "ruayy"
-        ],
-        "verified": false
-      },
-      {
-        "date": "2026-07-27",
-        "num4": null,
-        "top3": "511",
-        "top2": "11",
-        "bottom2": "25",
         "sources": [
           "ruayy"
         ],
