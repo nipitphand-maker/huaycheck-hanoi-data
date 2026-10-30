@@ -91,6 +91,10 @@ TH_MONTHS = {
     "มิถุนายน": 6, "กรกฎาคม": 7, "สิงหาคม": 8, "กันยายน": 9, "ตุลาคม": 10,
     "พฤศจิกายน": 11, "ธันวาคม": 12,
 }
+TH_MONTHS_ABBR = {
+    "ม.ค.": 1, "ก.พ.": 2, "มี.ค.": 3, "เม.ย.": 4, "พ.ค.": 5, "มิ.ย.": 6,
+    "ก.ค.": 7, "ส.ค.": 8, "ก.ย.": 9, "ต.ค.": 10, "พ.ย.": 11, "ธ.ค.": 12,
+}
 
 
 def _fetch_once(url, ua):
@@ -189,6 +193,21 @@ def iso_from_thai(s):
         return None
 
 
+def iso_from_thai_abbr(s):
+    """press '30 ต.ค. 69' -> '2026-10-30' (DD abbrMonth 2-digit-BE)."""
+    m = re.match(r"(\d{1,2})\s+([ก-๿.]+)\s+(\d{2})$", s.strip())
+    if not m:
+        return None
+    d, month_th, yy = int(m.group(1)), m.group(2), int(m.group(3))
+    mo = TH_MONTHS_ABBR.get(month_th)
+    if not mo:
+        return None
+    try:
+        return datetime(2500 + yy - 543, mo, d).strftime("%Y-%m-%d")
+    except ValueError:
+        return None
+
+
 def fresh(iso, today):
     if not iso:
         return False
@@ -204,7 +223,22 @@ def parse_press(text):
     out = {}
     for header, cat in PRESS_CATS.items():
         for m in re.finditer(re.escape(header), text):
-            seg = text[m.start(): m.start() + 200]
+            seg = text[m.start(): m.start() + 250]
+            # New format (2026-10): 'DD ต.ค. 69 NNNN NNN NN NN'
+            row = re.search(
+                r"(\d{1,2}\s+[ก-๿.]+\s+\d{2})\s+(\d{4})\s+(\d{3})\s+(\d{2})\s+(\d{2})",
+                seg,
+            )
+            if row:
+                out[cat] = {
+                    "date": iso_from_thai_abbr(row.group(1)),
+                    "num4": row.group(2),
+                    "top3": row.group(3),
+                    "top2": row.group(4),
+                    "bottom2": row.group(5),
+                }
+                break
+            # Legacy format: 'dd/mm/yy NNNN NNN NN NN'
             row = re.search(r"(\d{2}/\d{2}/\d{2})\s+(\d{4})\s+(\d{3})\s+(\d{2})\s+(\d{2})", seg)
             if row:
                 out[cat] = {
